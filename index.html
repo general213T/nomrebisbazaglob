@@ -1,0 +1,121 @@
+<h2>📞 ნომრების ბაზა</h2>
+
+<input id="number" placeholder="ნომერი">
+<input id="name" placeholder="სახელი">
+<input id="comment" placeholder="კომენტარი">
+<input type="color" id="textColor" value="#000000">
+<button id="addBtn">დამატება</button>
+
+<br><br>
+<input id="search" placeholder="ძიება">
+
+<h3>❌ არ დარეკილი</h3>
+<ul id="notCalledList"></ul>
+
+<h3>✅ დარეკილი</h3>
+<ul id="calledList"></ul>
+
+<script>
+// Firebase init
+const firebaseConfig = {
+  apiKey: "AIzaSyDc1MyyjHeK1SQs_LUuXFio0cH7qG8TKbc",
+  authDomain: "globshida.firebaseapp.com",
+  projectId: "globshida"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// დამატება ღილაკი
+document.getElementById("addBtn").addEventListener("click", () => {
+  let number = document.getElementById("number").value;
+  let name = document.getElementById("name").value;
+  let comment = document.getElementById("comment").value;
+  let color = document.getElementById("textColor").value;
+
+  if (!number) return alert("შეიყვანე ნომერი");
+
+  db.collection("numbers").add({
+    number,
+    name,
+    comment,
+    color,
+    called: false
+  });
+
+  document.getElementById("number").value = "";
+  document.getElementById("name").value = "";
+  document.getElementById("comment").value = "";
+});
+
+// განახლება/წაშლა ფუნქციები
+function deleteNumber(id) {
+  db.collection("numbers").doc(id).delete();
+}
+
+function editNumber(docRef, item) {
+  let number = prompt("ახალი ნომერი:", item.number);
+  if (!number) return;
+  let name = prompt("ახალი სახელი:", item.name);
+  let comment = prompt("ახალი კომენტარი:", item.comment);
+  let color = prompt("ახალი ფერი (hex):", item.color);
+  let called = confirm("ნომერი დარეკილია?");
+
+  docRef.update({
+    number,
+    name,
+    comment,
+    color,
+    called
+  });
+}
+
+// სიების განახლება
+function renderList(snapshot, search="") {
+  let notCalledList = document.getElementById("notCalledList");
+  let calledList = document.getElementById("calledList");
+  notCalledList.innerHTML = "";
+  calledList.innerHTML = "";
+
+  snapshot.forEach(doc => {
+    let item = doc.data();
+
+    // ძებნა
+    if (search) {
+      let s = search.toLowerCase();
+      if (!(item.number.toLowerCase().includes(s) || item.name.toLowerCase().includes(s) || item.comment.toLowerCase().includes(s))) return;
+    }
+
+    let li = document.createElement("li");
+    li.style.color = item.color;
+    li.textContent = `${item.number} - ${item.name} (${item.comment})`;
+
+    // ღილაკები
+    let editBtn = document.createElement("button");
+    editBtn.textContent = "✏️";
+    editBtn.style.marginLeft = "5px";
+    editBtn.addEventListener("click", () => editNumber(db.collection("numbers").doc(doc.id), item));
+
+    let deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "❌";
+    deleteBtn.style.marginLeft = "5px";
+    deleteBtn.addEventListener("click", () => deleteNumber(doc.id));
+
+    li.appendChild(editBtn);
+    li.appendChild(deleteBtn);
+
+    if (item.called) {
+      calledList.appendChild(li);
+    } else {
+      notCalledList.appendChild(li);
+    }
+  });
+}
+
+// რეალურ დროში სენსორი
+db.collection("numbers").onSnapshot(snapshot => renderList(snapshot));
+
+// ძებნა
+document.getElementById("search").addEventListener("input", () => {
+  let search = document.getElementById("search").value;
+  db.collection("numbers").get().then(snapshot => renderList(snapshot, search));
+});
